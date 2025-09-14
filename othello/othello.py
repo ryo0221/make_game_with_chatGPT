@@ -173,8 +173,8 @@ class MenuScreen:
     def __init__(self, screen):
         self.screen = screen
         self.bg_color = (0, 100, 0)
-        self.title_font = pygame.font.Font("../fonts/MEIRYOB.TTC", 72)
-        self.button_font = pygame.font.Font("../fonts/MEIRYO.TTC", 48)
+        self.title_font = pygame.font.Font("./fonts/MEIRYOB.TTC", 72)
+        self.button_font = pygame.font.Font("./fonts/MEIRYO.TTC", 48)
         self.options = ["人 vs 人", "人 vs AI"]
         self.selected_mode = None
 
