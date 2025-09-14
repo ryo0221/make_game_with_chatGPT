@@ -1,0 +1,2 @@
+# make_game_with_chatGPT
+chatGPTを使ってゲームを作る練習用のリポジトリです。
