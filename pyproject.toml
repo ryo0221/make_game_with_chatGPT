@@ -1,0 +1,14 @@
+[project]
+name = "make-reversi-with-chatgpt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ipympl>=0.9.7",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.6",
+    "numpy>=2.3.2",
+    "pygame>=2.6.1",
+    "pytest>=8.4.2",
+]
