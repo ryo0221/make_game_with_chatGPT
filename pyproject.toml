@@ -12,7 +12,3 @@ dependencies = [
     "pygame>=2.6.1",
     "pytest>=8.4.2",
 ]
-
-[tool.uv.scripts]
-# uv run test でテスト実行
-test = "PYTHONPATH=. pytest tests"
