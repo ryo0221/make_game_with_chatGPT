@@ -1,7 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 
-from othello.env import BOARD_SIZE, BLACK, WHITE, OthelloBoard
+from othello.env import BLACK, WHITE, BOARD_SIZE, OthelloBoard
 
 # --- 抽象クラス ---
 class AbstractAI(ABC):

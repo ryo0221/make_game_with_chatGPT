@@ -1,3 +1,5 @@
+import numpy as np
+
 EMPTY, BLACK, WHITE = 0, 1, -1
 BOARD_SIZE = 8
 
@@ -70,3 +72,88 @@ class OthelloBoard:
         new_board = OthelloBoard()
         new_board.board = [row[:] for row in self.board]  # 深いコピー
         return new_board
+    
+
+class OthelloEnv:
+    """オセロの強化学習環境。
+
+    Attributes:
+        board (OthelloBoard): 現在の盤面情報を保持。
+        current_player (int): 現在の手番。BLACK=1, WHITE=-1。
+    """
+
+    def __init__(self):
+        """OthelloEnv を初期化する。盤面はリセットされる。"""
+        self.board = OthelloBoard()
+        self.current_player = BLACK
+
+    def reset(self):
+        """盤面を初期状態にリセットし、最初の観察を返す。
+
+        Returns:
+            np.ndarray: 8x8の盤面状態。BLACK=1, WHITE=-1, EMPTY=0。
+        """
+        self.board.reset()
+        self.current_player = BLACK
+        return self._get_obs()
+
+    def _get_obs(self):
+        """現在の盤面状態を NumPy 配列で取得する。
+
+        Returns:
+            np.ndarray: 8x8の盤面状態。
+        """
+        return np.array(self.board.board, dtype=np.int8)
+
+    def legal_actions(self):
+        """現在の手番での合法手を返す。
+
+        Returns:
+            List[int]: 0~63 の整数で表現された合法手。
+        """
+        moves = self.board.valid_moves(self.current_player)
+        return [r*8 + c for r, c in moves]
+
+    def step(self, action):
+        """指定した行動を実行し、次の状態、報酬、終了フラグ、追加情報を返す。
+
+        Args:
+            action (int): 0~63 の整数で表現される行動。
+
+        Returns:
+            tuple:
+                np.ndarray: 次の盤面状態。
+                float: 報酬。ゲーム終了時に ±1、引き分け 0、途中は 0。
+                bool: ゲーム終了フラグ。
+                dict: 追加情報（未使用）。
+        """
+        r, c = divmod(action, 8)
+        self.board.make_move(self.current_player, r, c)
+        done = not (self.board.valid_moves(BLACK) or self.board.valid_moves(WHITE))
+        reward = 0.0
+        if done:
+            b, w = self.board.score()
+            if b > w:
+                reward = b - w if self.current_player == BLACK else -1.0
+            elif w > b:
+                reward = w - b if self.current_player == WHITE else -1.0
+            else:
+                reward = 0.0
+
+        # プレイヤー交代（相手に合法手がなければ同じプレイヤー）
+        self.current_player = -self.current_player if self.board.valid_moves(-self.current_player) else self.current_player
+
+        return self._get_obs(), reward, done, {}
+
+    def render(self):
+        """盤面をターミナルに表示する。
+
+        使用例:
+            env.render()
+        """
+        symbols = {BLACK: "●", WHITE: "○", EMPTY: "."}
+        print("  a b c d e f g h")
+        for r in range(8):
+            row = [symbols[self.board.board[r][c]] for c in range(8)]
+            print(f"{r+1} {' '.join(row)}")
+        print(f"Next player: {'BLACK' if self.current_player==BLACK else 'WHITE'}\n")
