@@ -1,5 +1,9 @@
 import pytest
-from othello.othello import OthelloBoard, OthelloGame, RandomAI, MinimaxAI, BLACK, WHITE, EMPTY
+import sys
+
+from othello.env import OthelloBoard, BLACK, WHITE, EMPTY
+from othello.game import OthelloGame
+from othello.ai import RandomAI, MinimaxAI
 
 def test_reset():
     board = OthelloBoard()

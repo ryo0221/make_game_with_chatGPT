@@ -4,10 +4,12 @@ import math
 import random
 from abc import ABC, abstractmethod
 
+from othello.env import BOARD_SIZE, BLACK, WHITE, OthelloBoard, EMPTY
+from othello.game import OthelloGame
+from othello.ai import RandomAI, MinimaxAI
 
 # 定数
-EMPTY, BLACK, WHITE = 0, 1, -1
-BOARD_SIZE = 8
+
 CELL_SIZE = 80
 WINDOW_SIZE = CELL_SIZE * BOARD_SIZE
 FPS = 30
@@ -19,166 +21,6 @@ WHITE_COLOR = (255, 255, 255)
 LINE_COLOR = (0, 0, 0)
 HIGHLIGHT_ALPHA = 120
 
-# ------------------ 盤面ロジック ------------------
-class OthelloBoard:
-    DIRECTIONS = [(-1,-1), (-1,0), (-1,1),
-                  (0,-1),          (0,1),
-                  (1,-1),  (1,0),  (1,1)]
-    
-    def __init__(self):
-        self.board = [[EMPTY]*BOARD_SIZE for _ in range(BOARD_SIZE)]
-        self.reset()
-
-    def reset(self):
-        self.board = [[EMPTY]*BOARD_SIZE for _ in range(BOARD_SIZE)]
-        mid = BOARD_SIZE//2
-        self.board[mid-1][mid-1] = WHITE
-        self.board[mid][mid] = WHITE
-        self.board[mid-1][mid] = BLACK
-        self.board[mid][mid-1] = BLACK
-
-    def inside(self, r, c):
-        return 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE
-
-    def valid_moves(self, player):
-        return [(r, c) for r in range(BOARD_SIZE)
-                for c in range(BOARD_SIZE)
-                if self.is_valid_move(player, r, c)]
-
-    def is_valid_move(self, player, r, c):
-        if not self.inside(r, c) or self.board[r][c] != EMPTY:
-            return False
-
-        for dr, dc in self.DIRECTIONS:
-            nr, nc = r+dr, c+dc
-            found_opponent = False
-            while self.inside(nr,nc) and self.board[nr][nc] == -player:
-                nr += dr
-                nc += dc
-                found_opponent = True
-            if found_opponent and self.inside(nr,nc) and self.board[nr][nc] == player:
-                return True
-        return False
-
-    def make_move(self, player, r, c):
-        if not self.is_valid_move(player, r, c):
-            return []
-        self.board[r][c] = player
-        flipped = []
-
-        for dr, dc in self.DIRECTIONS:
-            stones = []
-            nr, nc = r+dr, c+dc
-            while self.inside(nr,nc) and self.board[nr][nc] == -player:
-                stones.append((nr,nc))
-                nr += dr
-                nc += dc
-            if stones and self.inside(nr,nc) and self.board[nr][nc] == player:
-                for rr, cc in stones:
-                    self.board[rr][cc] = player
-                    flipped.append((rr, cc, -player, player))
-        return flipped
-
-    def score(self):
-        black = sum(row.count(BLACK) for row in self.board)
-        white = sum(row.count(WHITE) for row in self.board)
-        return black, white
-
-    def copy(self):
-        new_board = OthelloBoard()
-        new_board.board = [row[:] for row in self.board]  # 深いコピー
-        return new_board
-
-# ------------------ ゲーム進行 ------------------
-class OthelloGame:
-    def __init__(self):
-        self.board = OthelloBoard()
-        self.turn = BLACK
-
-    def switch_turn(self):
-        self.turn = -self.turn
-
-    def has_valid_moves(self, player):
-        return bool(self.board.valid_moves(player))
-
-    def is_game_over(self):
-        return not (self.has_valid_moves(BLACK) or self.has_valid_moves(WHITE))
-
-# --- 抽象クラス ---
-class AbstractAI(ABC):
-    def __init__(self, color):
-        self.color = color
-
-    @abstractmethod
-    def get_move(self, board):
-        """盤面を受け取り、(row, col) の手を返す。打てない場合は None"""
-        pass
-
-# --- ランダムAI ---
-class RandomAI(AbstractAI):
-    def get_move(self, board):
-        moves = board.valid_moves(self.color)
-        if not moves:
-            return None
-        return random.choice(moves)
-
-# --- ミニマックスAI ---
-class MinimaxAI(AbstractAI):
-    def __init__(self, ai_color, depth=3):
-        self.ai_color = ai_color      # このAIが担当する色
-        self.depth = depth
-
-    def evaluate(self, board: OthelloBoard):
-        """評価関数: 石の差 + 角のボーナス"""
-        score = 0
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                v = board.board[r][c]
-                if v == self.ai_color:
-                    score += 1
-                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
-                        score += 3
-                elif v == -self.ai_color:
-                    score -= 1
-                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
-                        score -= 3
-        return score
-
-    def minimax(self, board: OthelloBoard, depth: int, maximizing: bool, current_player: int):
-        """Minimax 再帰探索"""
-        if depth == 0 or not (board.valid_moves(BLACK) or board.valid_moves(WHITE)):
-            return self.evaluate(board), None
-
-        moves = board.valid_moves(current_player)
-        if not moves:
-            return self.evaluate(board), None
-
-        best_move = None
-        if maximizing:
-            max_eval = -float("inf")
-            for r, c in moves:
-                new_board = board.copy()
-                new_board.make_move(current_player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, False, -current_player)
-                if eval_score > max_eval:
-                    max_eval = eval_score
-                    best_move = (r, c)
-            return max_eval, best_move
-        else:
-            min_eval = float("inf")
-            for r, c in moves:
-                new_board = board.copy()
-                new_board.make_move(current_player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, True, -current_player)
-                if eval_score < min_eval:
-                    min_eval = eval_score
-                    best_move = (r, c)
-            return min_eval, best_move
-
-    def get_move(self, board: OthelloBoard):
-        """AIが次に打つ手を返す"""
-        _, move = self.minimax(board, self.depth, True, self.ai_color)
-        return move
 
 # ------------------ メニュー画面 ------------------
 class MenuScreen:
