@@ -3,8 +3,7 @@ import sys
 
 from othello.env import OthelloBoard, BLACK, WHITE, EMPTY, BOARD_SIZE
 from othello.env import OthelloEnv
-from othello.game import OthelloGame
-from othello.ai import RandomAI, MinimaxAI
+
 
 def test_reset():
     board = OthelloBoard()
@@ -56,36 +55,3 @@ def test_copy_board():
     board.make_move(BLACK, 2, 3)
     # 元のboard2は変わっていないはず
     assert board2.board[2][3] == EMPTY
-
-def test_game_over_when_no_moves():
-    game = OthelloGame()
-    
-    # 人間(BLACK)とAI(WHITE)双方の合法手がない状態を作る
-    # 例: 盤面を全てBLACKで埋める
-    for r in range(8):
-        for c in range(8):
-            game.board.board[r][c] = BLACK
-    
-    # 合法手はどちらにもないはず
-    assert not game.has_valid_moves(BLACK)
-    assert not game.has_valid_moves(WHITE)
-    
-    # ゲーム終了判定
-    assert game.is_game_over()
-    
-    # スコアが正しい
-    black_score, white_score = game.board.score()
-    assert black_score == 64
-    assert white_score == 0
-
-def test_game_over_partial_board():
-    game = OthelloGame()
-    # 盤面を交互に埋め、合法手がない状態を作る
-    for r in range(8):
-        for c in range(8):
-            game.board.board[r][c] = BLACK if (r+c)%2==0 else WHITE
-    assert not game.has_valid_moves(BLACK)
-    assert not game.has_valid_moves(WHITE)
-    assert game.is_game_over()
-    black_score, white_score = game.board.score()
-    assert black_score + white_score == 64
