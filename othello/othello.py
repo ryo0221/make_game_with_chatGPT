@@ -211,21 +211,6 @@ class MenuScreen:
             img_rect = img.get_rect(center=rect.center)
             self.screen.blit(img, img_rect)
             pygame.draw.circle(self.screen, BLACK_COLOR if i==0 else WHITE_COLOR, (rect.left+40, rect.centery), 20)
-        
-    
-    '''def draw_buttons(self, mouse_pos):
-        for i, text in enumerate(self.options):
-            x = WINDOW_SIZE // 2
-            y = 250 + i*120
-            rect = pygame.Rect(x-150, y-40, 300, 80)
-            color = (200, 200, 50) if rect.collidepoint(mouse_pos) else (255, 255, 255)
-            pygame.draw.rect(self.screen, (50,50,50), rect)
-            pygame.draw.rect(self.screen, color, rect, 3)
-            img = self.button_font.render(text, True, color)
-            img_rect = img.get_rect(center=rect.center)
-            self.screen.blit(img, img_rect)
-            pygame.draw.circle(self.screen, BLACK_COLOR if i==0 else WHITE_COLOR, (rect.left+40, rect.centery), 20)
-            '''
 
     def run(self):
         running = True
@@ -346,9 +331,6 @@ class OthelloGUI:
 
         pygame.quit()
         sys.exit()
-
-
-
 
 
 if __name__ == "__main__":
