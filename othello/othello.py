@@ -2,6 +2,8 @@ import pygame
 import sys
 import math
 import random
+from abc import ABC, abstractmethod
+
 
 # 定数
 EMPTY, BLACK, WHITE = 0, 1, -1
@@ -102,70 +104,80 @@ class OthelloGame:
     def is_game_over(self):
         return not (self.has_valid_moves(BLACK) or self.has_valid_moves(WHITE))
 
-# ------------------ ランダムAI ------------------
-class RandomAI:
-    def __init__(self, player):
-        self.player = player
+# --- 抽象クラス ---
+class AbstractAI(ABC):
+    def __init__(self, color):
+        self.color = color
 
-    def get_move(self, board: OthelloBoard):
-        moves = board.valid_moves(self.player)
+    @abstractmethod
+    def get_move(self, board):
+        """盤面を受け取り、(row, col) の手を返す。打てない場合は None"""
+        pass
+
+# --- ランダムAI ---
+class RandomAI(AbstractAI):
+    def get_move(self, board):
+        moves = board.valid_moves(self.color)
         if not moves:
             return None
         return random.choice(moves)
 
-# ------------------ Minimax AI ------------------
-class MinimaxAI:
-    def __init__(self, player, depth=3):
-        self.player = player
+# --- ミニマックスAI ---
+class MinimaxAI(AbstractAI):
+    def __init__(self, ai_color, depth=3):
+        self.ai_color = ai_color      # このAIが担当する色
         self.depth = depth
 
     def evaluate(self, board: OthelloBoard):
-        # シンプル評価: 石の差 + 角の価値
+        """評価関数: 石の差 + 角のボーナス"""
         score = 0
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 v = board.board[r][c]
-                if v == self.player:
+                if v == self.ai_color:
                     score += 1
-                    if (r==0 or r==BOARD_SIZE-1) and (c==0 or c==BOARD_SIZE-1):
-                        score += 3  # 角ボーナス
-                elif v == -self.player:
+                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
+                        score += 3
+                elif v == -self.ai_color:
                     score -= 1
-                    if (r==0 or r==BOARD_SIZE-1) and (c==0 or c==BOARD_SIZE-1):
+                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
                         score -= 3
         return score
 
-    def minimax(self, board: OthelloBoard, depth, maximizing):
-        if depth==0 or OthelloGame().is_game_over():
+    def minimax(self, board: OthelloBoard, depth: int, maximizing: bool, current_player: int):
+        """Minimax 再帰探索"""
+        if depth == 0 or not (board.valid_moves(BLACK) or board.valid_moves(WHITE)):
             return self.evaluate(board), None
-        player = self.player if maximizing else -self.player
-        moves = board.valid_moves(player)
+
+        moves = board.valid_moves(current_player)
         if not moves:
             return self.evaluate(board), None
+
         best_move = None
         if maximizing:
             max_eval = -float("inf")
-            for r,c in moves:
+            for r, c in moves:
                 new_board = board.copy()
-                new_board.make_move(player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, False)
+                new_board.make_move(current_player, r, c)
+                eval_score, _ = self.minimax(new_board, depth-1, False, -current_player)
                 if eval_score > max_eval:
                     max_eval = eval_score
-                    best_move = (r,c)
+                    best_move = (r, c)
             return max_eval, best_move
         else:
             min_eval = float("inf")
-            for r,c in moves:
+            for r, c in moves:
                 new_board = board.copy()
-                new_board.make_move(player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, True)
+                new_board.make_move(current_player, r, c)
+                eval_score, _ = self.minimax(new_board, depth-1, True, -current_player)
                 if eval_score < min_eval:
                     min_eval = eval_score
-                    best_move = (r,c)
+                    best_move = (r, c)
             return min_eval, best_move
 
     def get_move(self, board: OthelloBoard):
-        _, move = self.minimax(board, self.depth, True)
+        """AIが次に打つ手を返す"""
+        _, move = self.minimax(board, self.depth, True, self.ai_color)
         return move
 
 # ------------------ メニュー画面 ------------------
@@ -175,7 +187,7 @@ class MenuScreen:
         self.bg_color = (0, 100, 0)
         self.title_font = pygame.font.Font("./fonts/MEIRYOB.TTC", 72)
         self.button_font = pygame.font.Font("./fonts/MEIRYO.TTC", 48)
-        self.options = ["人 vs 人", "人 vs AI"]
+        self.options = ["人 vs 人", "人 vs AI", "AI vs AI"]
         self.selected_mode = None
 
     def draw_title(self):
@@ -192,6 +204,20 @@ class MenuScreen:
             x = WINDOW_SIZE // 2
             y = 250 + i*120
             rect = pygame.Rect(x-150, y-40, 300, 80)
+            color = (200,200,50) if rect.collidepoint(mouse_pos) else (255,255,255)
+            pygame.draw.rect(self.screen, (50,50,50), rect)
+            pygame.draw.rect(self.screen, color, rect, 3)
+            img = self.button_font.render(text, True, color)
+            img_rect = img.get_rect(center=rect.center)
+            self.screen.blit(img, img_rect)
+            pygame.draw.circle(self.screen, BLACK_COLOR if i==0 else WHITE_COLOR, (rect.left+40, rect.centery), 20)
+        
+    
+    '''def draw_buttons(self, mouse_pos):
+        for i, text in enumerate(self.options):
+            x = WINDOW_SIZE // 2
+            y = 250 + i*120
+            rect = pygame.Rect(x-150, y-40, 300, 80)
             color = (200, 200, 50) if rect.collidepoint(mouse_pos) else (255, 255, 255)
             pygame.draw.rect(self.screen, (50,50,50), rect)
             pygame.draw.rect(self.screen, color, rect, 3)
@@ -199,6 +225,7 @@ class MenuScreen:
             img_rect = img.get_rect(center=rect.center)
             self.screen.blit(img, img_rect)
             pygame.draw.circle(self.screen, BLACK_COLOR if i==0 else WHITE_COLOR, (rect.left+40, rect.centery), 20)
+            '''
 
     def run(self):
         running = True
@@ -211,18 +238,17 @@ class MenuScreen:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
+                    pygame.quit(); sys.exit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     for i, text in enumerate(self.options):
                         rect = pygame.Rect(WINDOW_SIZE//2-150, 250 + i*120-40, 300, 80)
                         if rect.collidepoint(event.pos):
-                            self.selected_mode = "PVP" if i==0 else "PVAI"
+                            self.selected_mode = ["PVP","PVAI","AIvsAI"][i]
                             running = False
-
             pygame.display.flip()
             clock.tick(FPS)
         return self.selected_mode
+
 
 # ------------------ GUI ------------------
 class OthelloGUI:
@@ -235,6 +261,9 @@ class OthelloGUI:
         self.clock = pygame.time.Clock()
         if mode=="PVAI":
             self.ai = MinimaxAI(WHITE)
+        elif mode=="AIvsAI":
+            self.black_ai = RandomAI(BLACK)
+            self.white_ai = MinimaxAI(WHITE, depth=2)
 
     def draw_board(self, draw_flips=True):
         self.screen.fill(GREEN)
@@ -302,17 +331,31 @@ class OthelloGUI:
                         self.game.board.make_move(self.game.turn, r, c)
                 self.game.switch_turn()
 
+            elif self.mode=="AIvsAI" and not self.game.is_game_over():
+                current_ai = self.black_ai if self.game.turn==BLACK else self.white_ai
+                move = current_ai.get_move(self.game.board)
+                if move:
+                    r,c = move
+                    self.game.board.make_move(self.game.turn, r, c)
+                self.game.switch_turn()
+
+            # 描画
             self.draw_board()
             pygame.display.flip()
             self.clock.tick(FPS)
+
         pygame.quit()
         sys.exit()
 
 
+
+
+
 if __name__ == "__main__":
+    
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
     menu = MenuScreen(screen)
-    mode = menu.run()  # "PVP" または "PVAI"
+    mode = menu.run()  # "PVP" または "PVAI" または "AIvsAI"
     gui = OthelloGUI(mode)
     gui.run()
