@@ -86,6 +86,7 @@ class OthelloEnv:
         """OthelloEnv を初期化する。盤面はリセットされる。"""
         self.board = OthelloBoard()
         self.current_player = BLACK
+        self.done = False
 
     def reset(self):
         """盤面を初期状態にリセットし、最初の観察を返す。
@@ -93,8 +94,9 @@ class OthelloEnv:
         Returns:
             np.ndarray: 8x8の盤面状態。BLACK=1, WHITE=-1, EMPTY=0。
         """
-        self.board.reset()
+        self.board = OthelloBoard()
         self.current_player = BLACK
+        self.done =False
         return self._get_obs()
 
     def _get_obs(self):
@@ -114,6 +116,17 @@ class OthelloEnv:
         moves = self.board.valid_moves(self.current_player)
         return [r*8 + c for r, c in moves]
 
+    def clone(self):
+        """現在の環境のディープコピーを返す."""
+        new_env = OthelloEnv()
+        # 盤面のコピー
+        new_env.board.board = [row[:] for row in self.board.board]
+        # 現在のプレイヤー
+        new_env.current_player = self.current_player
+        # ゲーム終了フラグ
+        new_env.done = self.done
+        return new_env
+
     def step(self, action):
         """指定した行動を実行し、次の状態、報酬、終了フラグ、追加情報を返す。
 
@@ -129,9 +142,9 @@ class OthelloEnv:
         """
         r, c = divmod(action, 8)
         self.board.make_move(self.current_player, r, c)
-        done = not (self.board.valid_moves(BLACK) or self.board.valid_moves(WHITE))
+        self.done = not (self.board.valid_moves(BLACK) or self.board.valid_moves(WHITE))
         reward = 0.0
-        if done:
+        if self.done:
             b, w = self.board.score()
             if b > w:
                 reward = b - w if self.current_player == BLACK else -1.0
@@ -143,7 +156,7 @@ class OthelloEnv:
         # プレイヤー交代（相手に合法手がなければ同じプレイヤー）
         self.current_player = -self.current_player if self.board.valid_moves(-self.current_player) else self.current_player
 
-        return self._get_obs(), reward, done, {}
+        return self._get_obs(), reward, self.done, {}
 
     def render(self):
         """盤面をターミナルに表示する。

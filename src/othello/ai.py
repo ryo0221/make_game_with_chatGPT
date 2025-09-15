@@ -1,80 +1,87 @@
 import random
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from othello.env import BLACK, WHITE, BOARD_SIZE, OthelloBoard
+from othello.env import OthelloEnv
 
 # --- 抽象クラス ---
 class AbstractAI(ABC):
-    def __init__(self, color):
-        self.color = color
+    """すべてのAIはこのインターフェースを実装する。"""
+
+    def __init__(self, player):
+        """
+        Args:
+            player (int): BLACK (1) または WHITE (-1)
+        """
+        self.player = player
 
     @abstractmethod
-    def get_move(self, board):
-        """盤面を受け取り、(row, col) の手を返す。打てない場合は None"""
+    def select_action(self, env):
+        """
+        次の手を決定する。
+        Args:
+            env (OthelloEnv): 強化学習用のオセロ環境
+        Returns:
+            int: 0~63 のアクション番号
+        """
         pass
 
 # --- ランダムAI ---
 class RandomAI(AbstractAI):
-    def get_move(self, board):
-        moves = board.valid_moves(self.color)
-        if not moves:
+    """ランダムに合法手を選ぶAI"""
+
+    def select_action(self, env):
+        legal = env.legal_actions()
+        if not legal:
             return None
-        return random.choice(moves)
+        return np.random.choice(legal)
+
 
 # --- ミニマックスAI ---
 class MinimaxAI(AbstractAI):
-    def __init__(self, ai_color, depth=3):
-        self.ai_color = ai_color      # このAIが担当する色
+    """ミニマックスで探索するAI"""
+
+    def __init__(self, player, depth=3):
+        super().__init__(player)
         self.depth = depth
 
-    def evaluate(self, board: OthelloBoard):
-        """評価関数: 石の差 + 角のボーナス"""
-        score = 0
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                v = board.board[r][c]
-                if v == self.ai_color:
-                    score += 1
-                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
-                        score += 3
-                elif v == -self.ai_color:
-                    score -= 1
-                    if (r == 0 or r == BOARD_SIZE-1) and (c == 0 or c == BOARD_SIZE-1):
-                        score -= 3
-        return score
+    def select_action(self, env):
+        _, action = self._minimax(env, self.depth, True)
+        return action
 
-    def minimax(self, board: OthelloBoard, depth: int, maximizing: bool, current_player: int):
-        """Minimax 再帰探索"""
-        if depth == 0 or not (board.valid_moves(BLACK) or board.valid_moves(WHITE)):
-            return self.evaluate(board), None
+    def _minimax(self, env, depth, maximizing):
+        if depth == 0 or env.done:
+            return self._evaluate(env), None
 
-        moves = board.valid_moves(current_player)
+        player = self.player if maximizing else -self.player
+        moves = env.legal_actions()
         if not moves:
-            return self.evaluate(board), None
+            return self._evaluate(env), None
 
         best_move = None
         if maximizing:
             max_eval = -float("inf")
-            for r, c in moves:
-                new_board = board.copy()
-                new_board.make_move(current_player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, False, -current_player)
+            for a in moves:
+                new_env = env.clone()
+                new_env.step(a)
+                eval_score, _ = self._minimax(new_env, depth-1, False)
                 if eval_score > max_eval:
                     max_eval = eval_score
-                    best_move = (r, c)
+                    best_move = a
             return max_eval, best_move
         else:
             min_eval = float("inf")
-            for r, c in moves:
-                new_board = board.copy()
-                new_board.make_move(current_player, r, c)
-                eval_score, _ = self.minimax(new_board, depth-1, True, -current_player)
+            for a in moves:
+                new_env = env.clone()
+                new_env.step(a)
+                eval_score, _ = self._minimax(new_env, depth-1, True)
                 if eval_score < min_eval:
                     min_eval = eval_score
-                    best_move = (r, c)
+                    best_move = a
             return min_eval, best_move
 
-    def get_move(self, board: OthelloBoard):
-        """AIが次に打つ手を返す"""
-        _, move = self.minimax(board, self.depth, True, self.ai_color)
-        return move
+    def _evaluate(self, env):
+        b, w = env.board.score()
+        return b - w if self.player == 1 else w - b

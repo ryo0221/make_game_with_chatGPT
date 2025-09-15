@@ -1,4 +1,5 @@
 from othello.env import OthelloEnv, BOARD_SIZE, BLACK, WHITE
+from othello.ai import RandomAI, MinimaxAI
 
 def test_reset_returns_initial_board():
     env = OthelloEnv()
@@ -45,3 +46,17 @@ def test_game_over_detection():
     # ゲーム終了判定
     obs, reward, done, info = env.step(0)  # ダミー手
     assert done is True
+
+def test_random_ai_move():
+    env = OthelloEnv()
+    env.reset()
+    ai = RandomAI(BLACK)
+    move = ai.select_action(env)
+    assert move in env.legal_actions()
+
+def test_minimax_ai_move():
+    env = OthelloEnv()
+    env.reset()
+    ai = MinimaxAI(BLACK, depth=1)
+    move = ai.select_action(env)
+    assert move in env.legal_actions()

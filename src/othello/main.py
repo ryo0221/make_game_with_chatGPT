@@ -4,8 +4,8 @@ import math
 import random
 from abc import ABC, abstractmethod
 
-from othello.env import BOARD_SIZE, BLACK, WHITE, OthelloBoard, EMPTY
-from othello.game import OthelloGame
+from othello.env import BOARD_SIZE, BLACK, WHITE, EMPTY
+from othello.env import OthelloEnv
 from othello.ai import RandomAI, MinimaxAI
 
 # 定数
@@ -65,12 +65,13 @@ class MenuScreen:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit(); sys.exit()
+                    pygame.quit()
+                    sys.exit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     for i, text in enumerate(self.options):
                         rect = pygame.Rect(WINDOW_SIZE//2-150, 250 + i*120-40, 300, 80)
                         if rect.collidepoint(event.pos):
-                            self.selected_mode = ["PVP","PVAI","AIvsAI"][i]
+                            self.selected_mode = ["PVP","PVAI","AIVAI"][i]
                             running = False
             pygame.display.flip()
             clock.tick(FPS)
@@ -82,42 +83,54 @@ class OthelloGUI:
     def __init__(self, mode="PVP"):
         pygame.init()
         self.mode = mode
-        self.game = OthelloGame()
+        self.env = OthelloEnv()
+        self.env.reset()
         self.screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
         pygame.display.set_caption("Othello")
         self.clock = pygame.time.Clock()
-        if mode=="PVAI":
-            self.ai = MinimaxAI(WHITE)
-        elif mode=="AIvsAI":
-            self.black_ai = RandomAI(BLACK)
-            self.white_ai = MinimaxAI(WHITE, depth=2)
+
+        if mode in ("PVAI", "AIVAI"):
+            self.ai_black = RandomAI(BLACK) if mode=="AIVAI" else None
+            self.ai_white = MinimaxAI(WHITE, depth=3) if mode=="PVAI" else None
+    
+    def handle_click(self, pos):
+        c = pos[0] // CELL_SIZE
+        r = pos[1] // CELL_SIZE
+        action = r * BOARD_SIZE + c
+        if action in self.env.legal_actions():
+            self.env.step(action)
 
     def draw_board(self, draw_flips=True):
         self.screen.fill(GREEN)
         for i in range(BOARD_SIZE+1):
             pygame.draw.line(self.screen, LINE_COLOR, (i*CELL_SIZE,0), (i*CELL_SIZE,WINDOW_SIZE))
             pygame.draw.line(self.screen, LINE_COLOR, (0,i*CELL_SIZE), (WINDOW_SIZE,i*CELL_SIZE))
+
         # 石描画
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
-                v = self.game.board.board[r][c]
+                v = self.env.board.board[r][c]
                 if v != EMPTY:
                     center = (c*CELL_SIZE + CELL_SIZE//2, r*CELL_SIZE + CELL_SIZE//2)
                     color = BLACK_COLOR if v==BLACK else WHITE_COLOR
                     pygame.draw.circle(self.screen, color, center, CELL_SIZE//2 - 5)
+
         # 合法手ハイライト
-        if draw_flips and not self.game.is_game_over():
-            moves = self.game.board.valid_moves(self.game.turn)
+        if draw_flips:
+            moves = self.env.legal_actions()
             alpha = int(100 + 80 * abs(math.sin(pygame.time.get_ticks()/300)))
-            color = (0,0,0,alpha) if self.game.turn==BLACK else (255,255,255,alpha)
-            for r,c in moves:
+            color = (0,0,0,alpha) if self.env.current_player == BLACK else (255,255,255,alpha)
+            for action in moves:
+                r, c = divmod(action, BOARD_SIZE)
                 s = pygame.Surface((CELL_SIZE,CELL_SIZE), pygame.SRCALPHA)
                 pygame.draw.circle(s, color, (CELL_SIZE//2,CELL_SIZE//2), CELL_SIZE//3)
                 self.screen.blit(s, (c*CELL_SIZE, r*CELL_SIZE))
+
         # 勝敗判定
-        if self.game.is_game_over():
+        """
+        if self.env.done:
             font = pygame.font.SysFont(None,36)
-            b,w = self.game.board.score()
+            b,w = self.env.board.score()
             if b>w:
                 text = f"Game Over! Black wins! ({b}-{w})"
             elif w>b:
@@ -127,7 +140,8 @@ class OthelloGUI:
             img = font.render(text, True, (255,255,0))
             rect = img.get_rect(center=(WINDOW_SIZE//2, WINDOW_SIZE//2))
             self.screen.blit(img, rect)
-
+        """
+    """        
     def handle_click(self, pos):
         c = pos[0] // CELL_SIZE
         r = pos[1] // CELL_SIZE
@@ -135,37 +149,28 @@ class OthelloGUI:
             self.game.board.make_move(self.game.turn, r, c)
             # 裏返しアニメーションはなし → 即描画
             self.game.switch_turn()
-
+    """
+            
     def run(self):
         running = True
         while running:
-            if self.game.turn == BLACK and not self.game.board.valid_moves(BLACK):
-                self.game.switch_turn()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN and not self.game.is_game_over() and self.game.board.valid_moves(BLACK):
-                    self.handle_click(event.pos)
-
+                elif event.type == pygame.MOUSEBUTTONDOWN and self.mode in ("PVP", "PVAI"):
+                    if self.env.current_player == BLACK or self.mode == "PVP":
+                        self.handle_click(event.pos)
+            
             # AIの手番処理
-            if self.mode=="PVAI" and self.game.turn==WHITE and not self.game.is_game_over():
-                moves = self.game.board.valid_moves(self.game.turn)
-                if moves:
-                    pygame.time.delay(300)  # 少し待って自然に
-                    move = self.ai.get_move(self.game.board)
-                    if move:
-                        r,c = move
-                        self.game.board.make_move(self.game.turn, r, c)
-                self.game.switch_turn()
-
-            elif self.mode=="AIvsAI" and not self.game.is_game_over():
-                current_ai = self.black_ai if self.game.turn==BLACK else self.white_ai
-                move = current_ai.get_move(self.game.board)
-                if move:
-                    r,c = move
-                    self.game.board.make_move(self.game.turn, r, c)
-                self.game.switch_turn()
-
+            if self.mode in ("PVAI", "AIVAI"):
+                current_ai = self.ai_black if self.env.current_player == BLACK else self.ai_white
+                if current_ai:
+                    moves = self.env.legal_actions()
+                    if moves:
+                        pygame.time.delay(300)  # 少し待って自然に
+                        action = current_ai.select_action(self.env)
+                        if action is not None:
+                            self.env.step(action)
             # 描画
             self.draw_board()
             pygame.display.flip()
